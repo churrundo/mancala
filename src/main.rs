@@ -1,4 +1,5 @@
 use std::fmt;
+
 #[derive(Debug)]
 enum Player {
     Player1,
@@ -19,52 +20,67 @@ impl GameState {
             Player::Player2 => (&mut self.player2_board, &mut self.player1_board),
         };
 
+        if current_board[pit_index] == 0 {
+            return Err("You cannot choose an empty pit.");
+        }
+
         let mut stones = current_board[pit_index];
         println!("Starting stones: {}", stones);
         current_board[pit_index] = 0;
 
-        let mut last_pit_index = pit_index;
-
         let mut current_pit = pit_index + 1;
+        let mut on_current_board = true;
 
-        while stones > 0 && current_pit < current_board.len() {
-            current_board[current_pit] += 1;
-            last_pit_index = current_pit;
+        while stones > 0 {
+            if on_current_board && current_pit == current_board.len() {
+                if let Player::Player1 = self.current_player {
+                    self.player1_score += 1;
+                } else {
+                    self.player2_score += 1;
+                }
+                stones -= 1;
+                if stones == 0 {
+                    println!("Last stone landed in Mancala. Player gets another turn.");
+                    return Ok(());
+                }
+                on_current_board = false; // Switch to the opponent's board
+                current_pit = 0;
+            } else if !on_current_board && current_pit == opponent_board.len() {
+                on_current_board = true; // Switch back to the current player's board
+                current_pit = 0;
+            }
+
+            if on_current_board {
+                current_board[current_pit] += 1;
+                println!(
+                    "Dropped stone in player's pit {}. Remaining stones: {}",
+                    current_pit,
+                    stones
+                );
+            } else {
+                opponent_board[current_pit] += 1;
+                println!(
+                    "Dropped stone in opponent's pit {}. Remaining stones: {}",
+                    current_pit,
+                    stones
+                );
+            }
             stones -= 1;
             current_pit += 1;
-            println!("Dropped stone in player's pit {}. Remaining stones: {}", current_pit, stones);
         }
 
-        if stones > 0 {
-            println!("Dropping stone in player's Mancala.");
-            if let Player::Player1 = self.current_player {
-                self.player1_score += 1;
-            } else {
-                self.player2_score += 1;
-            }
-            stones -= 1;
-            if stones == 0 {
-                println!("Last stone landed in Mancala. Player gets another turn.");
-                return Ok(());  // If the last stone lands in the Mancala, the player gets another turn.
-            }
-        }
-
-        let mut opponent_pit = 0;
-        while stones > 0 {
-            opponent_board[opponent_pit] += 1;
-            stones -= 1;
-            opponent_pit += 1;
-        }
-
-        last_pit_index = current_pit - 1;
+        let last_pit_index = if on_current_board {
+            current_pit - 1
+        } else {
+            opponent_board.len() - current_pit
+        };
 
         println!("Last pit index: {}", last_pit_index);
 
-        if current_board[last_pit_index] == 1 {
+        if on_current_board && current_board[last_pit_index] == 1 {
             let opponent_pit_index = opponent_board.len() - 1 - last_pit_index;
-            println!("Checking for capture condition...");
             if opponent_board[opponent_pit_index] > 0 {
-                println!("Capturing from opponent's pit: {}", opponent_pit_index);
+                println!("Capturing {} stones from opponent's pit: {}", opponent_board[opponent_pit_index], opponent_pit_index);
                 let captured_stones = opponent_board[opponent_pit_index];
                 opponent_board[opponent_pit_index] = 0;
                 if let Player::Player1 = self.current_player {
@@ -74,7 +90,7 @@ impl GameState {
                     self.player2_score += captured_stones + 1;
                     self.player2_board[last_pit_index] = 0;
                 }
-            }else {
+            } else {
                 println!("No stones to capture in opponent's pit: {}", opponent_pit_index);
             }
         }
